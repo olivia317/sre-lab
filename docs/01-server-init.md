@@ -64,3 +64,8 @@ Nginx successfully deployed.
 
 Public IP access test passed.
 
+## Verification
+
+Nginx was successfully accessed through the public IP.
+
+![Nginx Success](../screenshots/nginx-success.png)
