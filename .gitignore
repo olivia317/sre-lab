@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# SRE Lab secrets and runtime data
+*.env
+.env.*
+*.sql
+*.sql.gz
+*.dump
+*.backup
+.my.cnf
+mysqld_exporter.cnf
+secrets/
+backups/
+logs/

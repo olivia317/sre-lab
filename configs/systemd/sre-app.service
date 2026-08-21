@@ -1,0 +1,15 @@
+[Unit]
+Description=SRE Lab Flask Application
+After=network.target
+
+
+[Service]
+User=sre
+WorkingDirectory=/home/sre/sre-app
+ExecStart=/home/sre/sre-app/venv/bin/gunicorn --bind 127.0.0.1:8000 app:app
+Restart=always
+EnvironmentFile=/etc/sre-app.env
+
+
+[Install]
+WantedBy=multi-user.target

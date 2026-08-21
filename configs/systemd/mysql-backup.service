@@ -1,0 +1,7 @@
+[Unit]
+Description=Backup SRE MariaDB Database
+
+[Service]
+Type=oneshot
+User=sre
+ExecStart=/home/sre/scripts/mysql_backup.sh
