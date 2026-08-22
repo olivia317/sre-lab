@@ -166,6 +166,26 @@ up 恢复为 1，告警自动 resolved
 - [x] Alertmanager 告警接收
 - [x] 故障注入及告警恢复验证
 
+## 项目截图
+
+### 应用状态接口
+
+通过公网访问 `/api/status`，验证 Nginx、Gunicorn 和 Flask 请求链路正常。
+
+![Flask API Status](screenshots/01-api-status.png)
+
+### Prometheus Targets
+
+Prometheus 当前采集 Flask、MariaDB、Nginx、Node Exporter 和自身指标，所有 Target 均为 `UP`。
+
+![Prometheus Targets](screenshots/02-prometheus-targets.png)
+
+### Grafana Dashboard
+
+Grafana Dashboard 展示 CPU、内存、磁盘、系统负载、网络流量及 Nginx 服务状态。
+
+![Grafana Dashboard](screenshots/03-grafana-dashboard.png)
+
 ## V1.0 边界
 
 V1.0 已完成从部署、管理、持久化、备份到监控告警的基础闭环。目前 Alertmanager 已能接收和管理告警，但尚未接入邮件、企业微信等外部通知渠道；该部分不影响本版本对告警链路的验证。
@@ -181,4 +201,13 @@ V1.0 已完成从部署、管理、持久化、备份到监控告警的基础闭
 
 ## 项目文档
 
-详细部署命令、配置说明、故障记录和验证过程将整理至 `docs/` 目录；根 README 仅保留架构、成果和关键验证，方便快速了解项目。
+## 项目文档
+
+- [服务器初始化](docs/01-server-init.md)
+- [Nginx 部署](docs/02-nginx-deploy.md)
+- [Flask 应用部署](docs/03-python-service.md)
+- [Gunicorn 生产化部署](docs/04-gunicorn-deploy.md)
+- [MariaDB 备份与恢复](docs/05-mysql-backup.md)
+- [Prometheus 与 Grafana 监控](docs/06-monitoring.md)
+- [Alertmanager 告警与故障演练](docs/07-alertmanager.md)
+- [故障排查记录](docs/troubleshooting.md)
