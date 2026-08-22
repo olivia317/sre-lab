@@ -201,8 +201,6 @@ V1.0 已完成从部署、管理、持久化、备份到监控告警的基础闭
 
 ## 项目文档
 
-## 项目文档
-
 - [服务器初始化](docs/01-server-init.md)
 - [Nginx 部署](docs/02-nginx-deploy.md)
 - [Flask 应用部署](docs/03-python-service.md)
