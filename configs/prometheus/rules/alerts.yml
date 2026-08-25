@@ -1,11 +1,117 @@
 groups:
-  - name: sre-lab-alerts
+  - name: sre-lab-host-alerts
     rules:
-      - alert: InstanceDown
-        expr: up == 0
+      - alert: HighCPUUsage
+        expr: |
+          100 - (
+            avg by(instance) (
+              rate(node_cpu_seconds_total{mode="idle"}[5m])
+            ) * 100
+          ) > 80
+        for: 5m
+        labels:
+          severity: warning
+          category: host
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage has remained above 80% for more than 5 minutes."
+
+      - alert: HighMemoryUsage
+        expr: |
+          100 * (
+            1 - (
+              node_memory_MemAvailable_bytes
+              /
+              node_memory_MemTotal_bytes
+            )
+          ) > 80
+        for: 5m
+        labels:
+          severity: warning
+          category: host
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage has remained above 80% for more than 5 minutes."
+
+      - alert: HighDiskUsage
+        expr: |
+          100 * (
+            1 -
+            (
+              node_filesystem_avail_bytes{
+                mountpoint="/",
+                fstype!~"tmpfs|overlay"
+              }
+              /
+              node_filesystem_size_bytes{
+                mountpoint="/",
+                fstype!~"tmpfs|overlay"
+              }
+            )
+          ) > 90
+        for: 5m
+        labels:
+          severity: critical
+          category: host
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Root filesystem usage has remained above 90% for more than 5 minutes."
+
+  - name: sre-lab-service-alerts
+    rules:
+      - alert: NodeExporterDown
+        expr: up{job="node_exporter"} == 0
         for: 1m
         labels:
           severity: critical
+          category: service
         annotations:
-          summary: "Instance {{ $labels.instance }} is down"
-          description: "{{ $labels.job }} target {{ $labels.instance }} has been down for more than 1 minute."
+          summary: "Node Exporter is down"
+          description: "Node Exporter target {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: NginxDown
+        expr: nginx_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: service
+        annotations:
+          summary: "Nginx monitoring target is down"
+          description: "Nginx target {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: FlaskDown
+        expr: up{job="flask"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: service
+        annotations:
+          summary: "Flask application is down"
+          description: "Flask target {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: MariaDBDown
+        expr: mysql_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: service
+        annotations:
+          summary: "MariaDB monitoring target is down"
+          description: "MariaDB target {{ $labels.instance }} has been down for more than 1 minute."
+
+  - name: sre-lab-database-alerts
+    rules:
+      - alert: MariaDBHighConnectionUsage
+        expr: |
+          100 *
+          mysql_global_status_threads_connected
+          /
+          mysql_global_variables_max_connections
+          > 80
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+        annotations:
+          summary: "MariaDB connection usage is high"
+          description: "MariaDB connection usage on {{ $labels.instance }} has remained above 80% for more than 5 minutes. Current value: {{ $value }}%."

@@ -186,18 +186,44 @@ Grafana Dashboard 展示 CPU、内存、磁盘、系统负载、网络流量及 
 
 ![Grafana Dashboard](screenshots/03-grafana-dashboard.png)
 
-## V1.0 边界
+## V1.1 增强告警
 
-V1.0 已完成从部署、管理、持久化、备份到监控告警的基础闭环。目前 Alertmanager 已能接收和管理告警，但尚未接入邮件、企业微信等外部通知渠道；该部分不影响本版本对告警链路的验证。
+在 V1.0 基础监控告警链路之上，V1.1 完成了告警体系增强：
+
+- 增加 CPU、内存和磁盘使用率告警。
+- 增加 Node Exporter、Nginx、Flask 和 MariaDB 服务异常告警。
+- 增加 MariaDB 连接使用率告警。
+- 使用 `warning` 和 `critical` 区分告警严重程度。
+- 使用 `for` 持续时间减少瞬时波动造成的误报。
+- 接入 QQ SMTP，将告警邮件发送至实际收件邮箱。
+- 验证 Firing 与 Resolved 两种邮件通知。
+- 完成 Flask 服务停止、告警触发、服务恢复和告警解除的完整故障演练。
+
+告警链路如下：
+
+> 指标采集 → Prometheus 规则计算 → 告警触发 → Alertmanager 分组与路由 → 邮件通知 → 服务恢复 → Resolved 通知
+
+详细过程参见：[V1.1 增强告警与邮件通知](docs/08-enhanced-alerting.md)。
 
 ## 后续规划
 
-- 增加 CPU、内存、磁盘等资源告警规则。
-- 接入真实告警通知渠道。
-- 补充 Nginx、Flask、MariaDB 服务故障演练。
-- 完善日志采集与检索体系。
-- 将应用及依赖 Docker 化。
-- 通过 CI/CD 实现自动测试和部署。
+### V1.1 后续收尾
+
+- 补充 Nginx 和 MariaDB 的实际故障演练。
+- 根据实际运行情况继续优化告警阈值和持续时间。
+
+### V1.2 日志系统
+
+- 收集 Nginx access log 和 error log。
+- 收集 Flask/Gunicorn 应用日志。
+- 整理 systemd journal 日志。
+- 接入 Loki 和 Grafana，实现日志查询与展示。
+
+### V2.0 容器化与 CI/CD
+
+- 将 Flask 应用及相关依赖 Docker 化。
+- 使用 GitHub Actions 构建和测试 Docker 镜像。
+- 实现从代码提交到服务器部署的自动化流程。
 
 ## 项目文档
 
@@ -208,4 +234,5 @@ V1.0 已完成从部署、管理、持久化、备份到监控告警的基础闭
 - [MariaDB 备份与恢复](docs/05-mysql-backup.md)
 - [Prometheus 与 Grafana 监控](docs/06-monitoring.md)
 - [Alertmanager 告警与故障演练](docs/07-alertmanager.md)
+- [V1.1 增强告警与邮件通知](docs/08-enhanced-alerting.md)
 - [故障排查记录](docs/troubleshooting.md)
