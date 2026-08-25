@@ -1,13 +1,28 @@
 global:
   resolve_timeout: 5m
+  smtp_smarthost: 'smtp.qq.com:587'
+  smtp_from: 'your-sender@qq.com'
+  smtp_auth_username: 'your-sender@qq.com'
+
+  # Store the SMTP authorization code in this server-side file.
+  # Never commit the file to Git.
+  smtp_auth_password_file: '/etc/alertmanager/qq-smtp-auth'
+
+  smtp_require_tls: true
 
 route:
   group_by:
     - alertname
+    - instance
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 1h
-  receiver: 'null'
+  receiver: 'email-notifications'
 
 receivers:
-  - name: 'null'
+  - name: 'email-notifications'
+    email_configs:
+      - to: 'your-recipient@example.com'
+        send_resolved: true
+        headers:
+          subject: '[SRE Lab] {{ .Status }}: {{ .CommonLabels.alertname }}'

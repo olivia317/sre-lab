@@ -229,3 +229,6 @@ mysqld_exporter.cnf
 secrets/
 backups/
 logs/
+
+# Alertmanager SMTP credentials
+*-smtp-auth
