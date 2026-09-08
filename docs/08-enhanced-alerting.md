@@ -321,21 +321,185 @@ Outlook 成功收到：
 
 ---
 
-## 6. V1.1 告警闭环
+## 6. NginxDown 故障演练
+
+### 6.1 演练前基线
+
+故障注入前，Nginx 与 Nginx Exporter 均正常运行：
+
+```text
+nginx: active
+nginx-exporter: active
+nginx_up: 1
+/api/status: HTTP 200
+
+对应告警规则：
+
+- alert: NginxDown
+  expr: nginx_up == 0
+  for: 1m
+  labels:
+    severity: critical
+    category: service
+```
+
+### 6.2 故障注入与告警触发
+
+停止 Nginx：
+
+```bash
+sudo systemctl stop nginx
+```
+
+停止后观察到：
+
+```text
+nginx: inactive
+nginx-exporter: active
+127.0.0.1:80: Connection refused
+nginx_up: 0
+NginxDown: firing
+```
+
+虽然 Nginx Exporter 进程仍然运行，但它无法从 Nginx 状态接口获取有效数据，因此 `nginx_up` 变为 `0`。
+
+这也说明，Prometheus 的 `up{job="nginx"}` 主要表示 Prometheus 能否采集 Nginx Exporter，而 `nginx_up` 才能反映 Exporter 背后的 Nginx 服务是否正常。
+
+Alertmanager 成功发送 NginxDown Firing 邮件：
+
+![NginxDown Firing](../screenshots/06-nginx-alert-firing.png)
+
+### 6.3 服务恢复与告警解除
+
+恢复 Nginx：
+
+```bash
+sudo systemctl start nginx
+```
+
+恢复后进行验证：
+
+```bash
+systemctl is-active nginx
+curl -sS http://127.0.0.1/api/status
+curl -s http://127.0.0.1/nginx_status
+```
+
+验证结果：
+
+```text
+nginx: active
+/api/status: HTTP 200
+nginx_up: 1
+NginxDown: inactive
+active alerts: 0
+```
+
+Alertmanager 随后发送 NginxDown Resolved 邮件：
+
+![NginxDown Resolved](../screenshots/07-nginx-alert-resolved.png)
+
+本次演练证明，Nginx 服务发生异常后，Prometheus 能通过 `nginx_up` 发现故障，Alertmanager 能发送 Firing 通知；服务恢复后，告警能够自动解除并发送 Resolved 通知。
+
+---
+
+## 7. MariaDB 故障演练
+
+### 7.1 演练前基线
+
+演练前，MariaDB 和 MySQL Exporter 均正常运行：
+
+```text
+mariadb: active
+mysqld-exporter: active
+mysql_up: 1
+/api/status: HTTP 200
+/api/servers: HTTP 200
+```
+
+对应告警规则：
+
+```yaml
+- alert: MariaDBDown
+  expr: mysql_up == 0
+  for: 1m
+  labels:
+    severity: critical
+    category: service
+```
+
+### 7.2 故障注入与业务影响
+
+停止 MariaDB：
+
+```bash
+sudo systemctl stop mariadb
+```
+
+停止后观察到：
+
+```text
+mariadb: inactive
+mysqld-exporter: active
+/api/status: HTTP 200
+/api/servers: HTTP 500
+mysql_up: 0
+MariaDBDown: firing
+```
+
+`/api/status` 仍然返回 HTTP 200，说明 Nginx、Gunicorn 和 Flask 进程仍在运行。
+
+但是 `/api/servers` 需要访问数据库，因此返回 HTTP 500。这说明应用进程存活并不代表所有业务功能都正常，数据库等外部依赖也需要单独监控。
+
+虽然 MySQL Exporter 进程仍然处于 active 状态，但 `mysql_up` 已经变为 `0`，准确反映了 MariaDB 服务不可用。
+
+Alertmanager 成功发送 MariaDBDown Firing 邮件：
+
+![MariaDBDown Firing](../screenshots/08-mariadb-alert-firing.png)
+
+### 7.3 数据库恢复与告警解除
+
+恢复 MariaDB：
+
+```bash
+sudo systemctl start mariadb
+```
+
+恢复后进行验证：
+
+```text
+mariadb: active
+/api/status: HTTP 200
+/api/servers: HTTP 200
+mysql_up: 1
+MariaDBDown: inactive
+active alerts: 0
+```
+
+Alertmanager 随后发送 MariaDBDown Resolved 邮件：
+
+![MariaDBDown Resolved](../screenshots/09-mariadb-alert-resolved.png)
+
+本次演练证明，MariaDB 故障会影响依赖数据库的业务接口，但不会必然导致 Flask 进程停止。通过同时监控应用健康状态、业务接口和 `mysql_up` 指标，可以更准确地判断故障范围。
+
+---
+
+## 8. V1.1 告警闭环
+
+V1.1 完成的告警处理流程如下：
 
 ```text
 异常发生
-→ Prometheus 指标异常
-→ 告警进入 pending
-→ 持续超过 for 时间
-→ 告警进入 firing
-→ Alertmanager 分组处理
-→ QQ SMTP 发送邮件
-→ Outlook 收到 Firing
+→ Exporter 采集到指标异常
+→ Prometheus 告警进入 pending
+→ 异常持续超过 for 时间
+→ Prometheus 告警进入 firing
+→ Alertmanager 接收、分组并路由告警
+→ QQ SMTP 发送 Firing 邮件
 → 服务恢复
-→ Prometheus 告警 inactive
-→ Alertmanager 清除告警
-→ Outlook 收到 Resolved
+→ Prometheus 告警恢复为 inactive
+→ Alertmanager 清除活动告警
+→ QQ SMTP 发送 Resolved 邮件
 ```
 
-V1.1 已将基础告警系统扩展为具有资源监控、服务监控、数据库监控和真实通知能力的告警体系。
+V1.1 已完成 Flask、Nginx 和 MariaDB 的实际故障演练，并将基础告警系统扩展为具备主机资源监控、服务监控、数据库监控和真实邮件通知能力的告警体系。
