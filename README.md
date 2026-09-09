@@ -36,6 +36,7 @@ flowchart TB
 | 备份 | Shell、mysqldump |
 | 指标采集 | Prometheus、Node Exporter、Nginx Exporter、mysqld_exporter、prometheus_client |
 | 可视化与告警 | Grafana、Alertmanager |
+| 日志采集与检索 | Grafana Alloy、Loki、LogQL、systemd journal |
 | 版本管理 | Git、GitHub |
 
 ## V1.0 已实现功能
@@ -205,14 +206,26 @@ Grafana Dashboard 展示 CPU、内存、磁盘、系统负载、网络流量及 
 
 详细过程参见：[V1.1 增强告警与邮件通知](docs/08-enhanced-alerting.md)。
 
+
+## V1.2 集中日志系统
+
+在 V1.1 监控告警基础上，完成集中日志采集、查询和故障定位：
+
+- 使用 Grafana Alloy 采集 Nginx、MariaDB 文件日志和应用 systemd journal。
+- 使用 Loki 单机模式存储日志，配置 7 天保留策略。
+- Loki HTTP、gRPC 和 Alloy 管理端口均仅监听 `127.0.0.1`。
+- 接入 Grafana Explore，使用 LogQL 按服务和请求内容检索日志。
+- 解析 Nginx access log 原始时间戳，修正历史日志集中显示在首次采集时刻的问题。
+- 完成 Flask 停止 → HTTP 502 → upstream 连接失败定位 → 应用恢复 → HTTP 200 验证。
+
+日志链路：
+
+> 文件日志 / systemd journal → Grafana Alloy → Loki → Grafana Explore
+
+详细过程参见：[V1.2 Loki + Grafana Alloy 日志系统](docs/09-logging.md)。
+
 ## 后续规划
 
-### V1.2 日志系统
-
-- 收集 Nginx access log 和 error log。
-- 收集 Flask/Gunicorn 应用日志。
-- 整理 systemd journal 日志。
-- 接入 Loki 和 Grafana，实现日志查询与展示。
 
 ### V2.0 容器化与 CI/CD
 
@@ -230,4 +243,5 @@ Grafana Dashboard 展示 CPU、内存、磁盘、系统负载、网络流量及 
 - [Prometheus 与 Grafana 监控](docs/06-monitoring.md)
 - [Alertmanager 告警与故障演练](docs/07-alertmanager.md)
 - [V1.1 增强告警与邮件通知](docs/08-enhanced-alerting.md)
+- [V1.2 Loki + Grafana Alloy 日志系统](docs/09-logging.md)
 - [故障排查记录](docs/troubleshooting.md)

@@ -1,0 +1,87 @@
+logging {
+	level = "info"
+}
+
+local.file_match "nginx" {
+	path_targets = [
+		{
+			"__path__" = "/var/log/nginx/access.log",
+			"host"     = "sre-lab",
+			"service"  = "nginx",
+			"log_type" = "access",
+		},
+		{
+			"__path__" = "/var/log/nginx/error.log",
+			"host"     = "sre-lab",
+			"service"  = "nginx",
+			"log_type" = "error",
+		},
+	]
+}
+
+loki.source.file "nginx" {
+	targets    = local.file_match.nginx.targets
+	forward_to = [loki.process.nginx.receiver]
+}
+
+local.file_match "mariadb" {
+	path_targets = [
+		{
+			"__path__" = "/var/log/mariadb/mariadb.log",
+			"host"     = "sre-lab",
+			"service"  = "mariadb",
+			"log_type" = "error",
+		},
+	]
+}
+
+loki.source.file "mariadb" {
+	targets    = local.file_match.mariadb.targets
+	forward_to = [loki.write.local.receiver]
+}
+
+loki.source.journal "sre_app" {
+	matches = "_SYSTEMD_UNIT=sre-app.service"
+	max_age = "168h"
+	labels  = {
+		"host"     = "sre-lab",
+		"service"  = "sre-app",
+		"log_type" = "journal",
+	}
+	forward_to = [loki.write.local.receiver]
+}
+
+loki.source.journal "mariadb_service" {
+	matches = "_SYSTEMD_UNIT=mariadb.service"
+	max_age = "168h"
+	labels  = {
+		"host"     = "sre-lab",
+		"service"  = "mariadb",
+		"log_type" = "journal",
+	}
+	forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+	endpoint {
+		url = "http://127.0.0.1:3100/loki/api/v1/push"
+	}
+}
+
+loki.process "nginx" {
+	stage.match {
+		selector = "{log_type=\"access\"}"
+
+		stage.regex {
+			expression = `^[^ ]+ - [^ ]+ \[(?P<timestamp>[^\]]+)\]`
+		}
+
+		stage.timestamp {
+			source            = "timestamp"
+			format            = "02/Jan/2006:15:04:05 -0700"
+			action_on_failure = "skip"
+		}
+	}
+
+	forward_to = [loki.write.local.receiver]
+}
