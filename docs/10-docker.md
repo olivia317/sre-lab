@@ -82,7 +82,16 @@ Compose 显式使用 `network_mode: bridge`，沿用本次验证的网络。
 
 ## 后续工作
 
-- 完善重启策略、健康检查与容器日志管理。
+- 完善容器日志管理，并进行自动重启故障演练。
 - 验证容器业务写入与恢复流程。
 - 验证后再切换 Nginx，并检查监控和日志采集链路。
 - 接入 CI/CD，完成自动构建、发布和回退。
+
+## 运行管理增强
+
+- Compose 增加 restart: unless-stopped 重启策略。
+- 增加容器内 /api/status HTTP 健康检查，当前状态为 healthy。
+- 健康检查不验证数据库，unhealthy 本身不会触发自动重启。
+- 服务器已启用 docker.service 和 containerd.service 开机启动。
+- 更新后，容器数据库接口与原业务数据库接口均返回 HTTP 200。
+- 自动重启策略已配置，实际故障演练尚未执行。
