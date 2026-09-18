@@ -1,0 +1,13 @@
+name: sre-lab-dev
+
+services:
+  app:
+    image: sre-lab-app:v2.0-dev
+    container_name: sre-app-dev
+    network_mode: bridge
+    ports:
+      - "127.0.0.1:8001:8000"
+    env_file:
+      - /etc/sre-container.env
+    mem_limit: 256m
+    cpus: 0.5

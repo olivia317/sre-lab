@@ -108,7 +108,7 @@ def update_server(server_id):
     status = data.get("status")
 
     if not status:
-        return jsonoify({
+        return jsonify({
             "error": "status is required"
         }),400
 
