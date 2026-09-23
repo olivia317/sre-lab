@@ -6,14 +6,14 @@
 并验证容器能够访问宿主机 MariaDB。
 
 本阶段保留原 systemd 应用，使用独立端口并行验证。
-尚未切换 Nginx，也尚未实现 CI/CD。
+已经切换 Nginx，尚未实现 CI/CD。
 
 ## 当前部署关系
 
-| 入口 | 应用 | 数据库 |
-| --- | --- | --- |
-| Nginx → 127.0.0.1:8000 | 原 systemd Gunicorn/Flask | 宿主机 MariaDB |
-| 127.0.0.1:8001 → 容器内 8000 | Compose 管理的 Gunicorn/Flask | 同一宿主机 MariaDB |
+- 正式入口：公网 80 → Nginx → 宿主机 127.0.0.1:8001
+  → 容器内 8000 → Gunicorn/Flask → 宿主机 MariaDB。
+- 原 systemd 应用继续监听宿主机 8000，保留用于回退。
+- 两套应用共享数据库，并非数据隔离的两套环境。
 
 ## 配置文件
 
@@ -142,3 +142,56 @@ max-file: "3"。重建容器后，通过 docker inspect 确认参数生效。
 sre_db.server_info 表，8001 测试入口不代表数据库隔离。
 
 本次完成正常路径验证，尚未覆盖全部异常输入和并发场景。
+
+
+## 业务入口与可观测性迁移（2026-09-23）
+
+### Nginx
+
+将 configs/nginx/sre-lab.conf 对应业务上游由 8000 改为 8001，
+通过 nginx -t 后 reload。
+
+验证：
+- Nginx 本机入口、容器直连和公网入口返回相同容器 hostname。
+- 经 Nginx 查询数据库返回 HTTP 200。
+- 原应用 8000 数据库接口返回 HTTP 200。
+- /nginx_status 正常。
+
+服务器切换前备份：
+/etc/nginx/sre-lab.conf.before-container-20260923-190139
+
+回退时恢复该备份至 /etc/nginx/conf.d/sre-lab.conf，
+通过 nginx -t 后 reload。若业务回退到原应用，还需同步调整监控目标。
+
+### Prometheus
+
+将 flask 任务目标由 127.0.0.1:8000 改为 127.0.0.1:8001。
+promtool 校验通过后，向 Prometheus 主进程发送 SIGHUP 热加载。
+
+验证：
+up{job="flask",instance="127.0.0.1:8001"} = 1
+
+Flask 可用性告警按 job="flask" 匹配，无需修改该表达式。
+Grafana 面板是否引用旧 instance 尚待核对。
+
+### Alloy 与 Loki
+
+新增 Docker 容器发现、目标筛选和日志采集配置，
+仅采集 sre-app-dev，复用现有 loki.write.local。
+
+标签：
+- host="sre-lab"
+- service="sre-app"
+- log_type="docker"
+- container="sre-app-dev"
+
+部署时将 alloy 用户加入 docker 组，并重启 Alloy 使权限生效。
+此权限变更不包含在 config.alloy 中；docker 组具有高权限，
+不是仅能读取日志的权限。
+
+保留原 systemd 应用的 journal 日志采集。
+
+通过 Nginx 请求：
+/api/status?probe=alloy-docker-check
+
+在 Loki 中成功查询到对应容器访问日志，确认采集链路打通。

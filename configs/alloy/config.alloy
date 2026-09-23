@@ -85,3 +85,36 @@ loki.process "nginx" {
 
 	forward_to = [loki.write.local.receiver]
 }
+
+discovery.docker "sre_app" {
+	host             = "unix:///var/run/docker.sock"
+	refresh_interval = "15s"
+}
+
+discovery.relabel "sre_app_docker" {
+	targets = discovery.docker.sre_app.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/sre-app-dev"
+		action        = "keep"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "container"
+		replacement   = "$1"
+	}
+}
+
+loki.source.docker "sre_app" {
+	host    = "unix:///var/run/docker.sock"
+	targets = discovery.relabel.sre_app_docker.output
+	labels  = {
+		"host"     = "sre-lab",
+		"service"  = "sre-app",
+		"log_type" = "docker",
+	}
+	forward_to = [loki.write.local.receiver]
+}
