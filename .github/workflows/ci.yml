@@ -1,0 +1,83 @@
+name: SRE Lab CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/v2.0-docker
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  docker-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Build Docker image
+        run: docker build --tag sre-lab-app:ci .
+
+      - name: Start container
+        run: |
+          docker run --detach \
+            --name sre-app-ci \
+            --publish 127.0.0.1:18001:8000 \
+            sre-lab-app:ci
+
+      - name: Wait for application
+        shell: bash
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error \
+              --max-time 2 \
+              http://127.0.0.1:18001/api/status \
+              --output /tmp/sre-status.json; then
+              cat /tmp/sre-status.json
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Application did not become ready"
+          exit 1
+
+      - name: Verify status and metrics
+        run: |
+          python3 - <<'PY'
+          import json
+          import urllib.request
+
+          base = "http://127.0.0.1:18001"
+
+          with urllib.request.urlopen(base + "/api/status", timeout=5) as response:
+              assert response.status == 200
+              payload = json.load(response)
+
+          assert payload["status"] == "running", payload
+          assert payload.get("server"), payload
+          print("PASS: /api/status")
+
+          with urllib.request.urlopen(base + "/metrics", timeout=5) as response:
+              assert response.status == 200
+              metrics = response.read().decode("utf-8")
+
+          assert "flask_http_requests_total{" in metrics, metrics
+          print("PASS: /metrics")
+          PY
+
+      - name: Show container logs
+        if: always()
+        run: docker logs --tail 100 sre-app-ci || true
+
+      - name: Remove test container
+        if: always()
+        run: docker rm --force sre-app-ci || true
