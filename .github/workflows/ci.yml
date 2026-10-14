@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   docker-smoke-test:
@@ -24,7 +25,11 @@ jobs:
           persist-credentials: false
 
       - name: Build Docker image
-        run: docker build --tag sre-lab-app:ci .
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag sre-lab-app:ci .
 
       - name: Start container
         run: |
@@ -73,6 +78,27 @@ jobs:
           assert "flask_http_requests_total{" in metrics, metrics
           print("PASS: /metrics")
           PY
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" |
+            docker login ghcr.io \
+              --username "$GITHUB_ACTOR" \
+              --password-stdin
+
+      - name: Publish tested image
+        if: github.event_name == 'push'
+        run: |
+          image_ref="ghcr.io/${GITHUB_REPOSITORY,,}:sha-${GITHUB_SHA}"
+
+          docker tag sre-lab-app:ci "$image_ref"
+          docker push "$image_ref"
+
+          printf 'Published image: `%s`\n' "$image_ref" \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show container logs
         if: always()
