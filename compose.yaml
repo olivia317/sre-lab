@@ -2,7 +2,7 @@ name: sre-lab-dev
 
 services:
   app:
-    image: ghcr.io/olivia317/sre-lab@sha256:08b2db2c35d11c7fe89bab777c22b89616b3abbfcdef05aa98d7873237362e16
+    image: "${APP_IMAGE:-ghcr.io/olivia317/sre-lab@sha256:08b2db2c35d11c7fe89bab777c22b89616b3abbfcdef05aa98d7873237362e16}"
     container_name: sre-app-dev
     network_mode: bridge
     ports:
