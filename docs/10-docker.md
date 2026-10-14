@@ -195,3 +195,49 @@ Grafana 面板是否引用旧 instance 尚待核对。
 /api/status?probe=alloy-docker-check
 
 在 Loki 中成功查询到对应容器访问日志，确认采集链路打通。
+
+
+## 2026-10-14：首次部署 GHCR 镜像
+
+### 构建与发布
+
+GitHub Actions 在指定分支 push 后构建 Docker 镜像，启动临时容器，
+检查 `/api/status` 和 `/metrics`，通过后将同一个镜像发布到 GHCR。
+PR 运行只测试，不发布。
+
+- 源码提交：`52f765bf7db4204d162ebf688dc310a4e9f504b5`
+- 镜像标签：`ghcr.io/olivia317/sre-lab:sha-52f765bf7db4204d162ebf688dc310a4e9f504b5`
+- 部署镜像：`ghcr.io/olivia317/sre-lab@sha256:08b2db2c35d11c7fe89bab777c22b89616b3abbfcdef05aa98d7873237362e16`
+
+CI 使用 GITHUB_TOKEN 发布；服务器使用具有 read:packages 权限的
+PAT classic 拉取私有镜像。凭证不进入仓库。
+
+### 部署与验证
+
+1. 服务器拉取镜像，通过 Revision 标签核对提交号。
+2. 在本地 8002 端口启动临时容器，使用现有数据库环境配置。
+3. 验证状态接口和数据库查询接口均返回 HTTP 200。
+4. 备份 Compose，将正式应用的 image 改为镜像摘要。
+5. 使用 Compose 重建 app，并等待健康检查通过。
+6. 验证 Nginx 返回的 hostname 与新容器一致，数据库接口返回 200。
+7. 验证 Prometheus 的 Flask target 为 up=1。
+8. 在 Loki 中查到新容器的专用探测日志。
+9. 清理临时验证容器，保留旧镜像。
+
+当前已完成自动构建、冒烟测试、镜像发布和手动部署，尚未实现自动部署。
+本次数据库验证为读取操作；未重新执行完整 CRUD 测试。
+
+### 回退准备
+
+- 旧镜像：`sre-lab-app:v2.0-dev`
+- Compose 备份：
+  `/home/sre/sre-lab-build/v2.0/compose.yaml.before-ghcr-20261014-104918`
+
+需要回退时，在服务器执行：
+
+    cd /home/sre/sre-lab-build/v2.0
+    sudo cp -a compose.yaml.before-ghcr-20261014-104918 compose.yaml
+    sudo docker compose up -d --no-deps --pull never --wait --wait-timeout 120 app
+
+回退后重新验证健康状态、Nginx 数据库接口、指标和日志。
+上述回退路径已准备，本次未实际执行回退演练。
