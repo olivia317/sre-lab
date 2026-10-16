@@ -1,0 +1,67 @@
+name: SRE Lab SSH Check
+
+on:
+  push:
+    branches:
+      - feature/v2.0-docker
+    paths:
+      - ".github/workflows/ssh-check.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ssh-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Verify restricted SSH connection
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          : "${DEPLOY_HOST:?Missing DEPLOY_HOST}"
+          : "${DEPLOY_USER:?Missing DEPLOY_USER}"
+          : "${DEPLOY_SSH_KEY:?Missing DEPLOY_SSH_KEY}"
+          : "${DEPLOY_KNOWN_HOSTS:?Missing DEPLOY_KNOWN_HOSTS}"
+
+          [[ "$DEPLOY_HOST" == "82.156.133.5" ]]
+          [[ "$DEPLOY_USER" == "sre-deploy" ]]
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/sre-ssh.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+
+          printf '%s\n' "$DEPLOY_SSH_KEY" |
+            tr -d '\r' > "$ssh_dir/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" |
+            tr -d '\r' > "$ssh_dir/known_hosts"
+
+          ssh-keygen -F "$DEPLOY_HOST" \
+            -f "$ssh_dir/known_hosts" >/dev/null
+
+          result="$(ssh -F /dev/null -T \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$ssh_dir/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null \
+            -o HostKeyAlgorithms=ssh-ed25519 \
+            -o ConnectTimeout=10 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=2 \
+            -i "$ssh_dir/key" \
+            "$DEPLOY_USER@$DEPLOY_HOST" check)"
+
+          [[ "$result" == "SRE_DEPLOY_SSH_OK" ]]
+          echo "PASS: restricted SSH connection"
+
+          printf '%s\n' \
+            'SSH connection verified. No deployment was performed.' \
+            >> "$GITHUB_STEP_SUMMARY"
